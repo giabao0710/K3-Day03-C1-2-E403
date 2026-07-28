@@ -4,8 +4,16 @@ Nơi khai báo tất cả các "món đồ nghề" mà ReAct Agent có thể g�
 """
 
 import json
+from datetime import datetime
 
 import requests
+from viewing_store import (
+    create_event_for_request,
+    create_viewing_request,
+    get_available_slots,
+    get_calendar_event_for_request,
+    get_viewing_request,
+)
 
 
 CHOTOT_API_URL = "https://gateway.chotot.com/v1/public/ad-listing"
@@ -183,10 +191,128 @@ def get_listing_details(listing_id: int) -> str:
     return json.dumps(listing, ensure_ascii=False, indent=2)
 
 
+def check_viewing_slots(listing_id: int, viewing_date: str) -> str:
+    """
+    Kiểm tra các khung giờ còn trống để xem nhà cho một tin đăng.
+
+    Args:
+        listing_id (int): Mã tin đăng cần xem nhà.
+        viewing_date (str): Ngày xem nhà theo định dạng YYYY-MM-DD.
+
+    Returns:
+        str: JSON string chứa các khung giờ còn trống.
+    """
+    try:
+        datetime.strptime(viewing_date, "%Y-%m-%d")
+    except ValueError:
+        return "LỖI: viewing_date phải theo định dạng YYYY-MM-DD."
+
+    available_slots = get_available_slots(listing_id, viewing_date)
+    payload = {
+        "tool": "check_viewing_slots",
+        "listing_id": listing_id,
+        "viewing_date": viewing_date,
+        "available_slots": available_slots,
+    }
+    return json.dumps(payload, ensure_ascii=False, indent=2)
+
+
+def send_viewing_request(
+    listing_id: int,
+    viewing_date: str,
+    slot: str,
+    customer_name: str,
+    customer_phone: str,
+) -> str:
+    """
+    Gửi yêu cầu đặt lịch xem nhà và lưu trạng thái pending vào SQLite.
+
+    Args:
+        listing_id (int): Mã tin đăng cần xem nhà.
+        viewing_date (str): Ngày xem nhà theo định dạng YYYY-MM-DD.
+        slot (str): Khung giờ xem nhà, ví dụ 14:00.
+        customer_name (str): Tên khách cần đặt lịch.
+        customer_phone (str): Số điện thoại liên hệ của khách.
+
+    Returns:
+        str: JSON string chứa request_id và trạng thái yêu cầu.
+    """
+    try:
+        datetime.strptime(viewing_date, "%Y-%m-%d")
+    except ValueError:
+        return "LỖI: viewing_date phải theo định dạng YYYY-MM-DD."
+
+    available_slots = get_available_slots(listing_id, viewing_date)
+    if slot not in available_slots:
+        return f"LỖI: Khung giờ {slot} không còn trống cho ngày {viewing_date}."
+
+    request_id = create_viewing_request(
+        listing_id=listing_id,
+        viewing_date=viewing_date,
+        slot=slot,
+        customer_name=customer_name,
+        customer_phone=customer_phone,
+    )
+    payload = {
+        "tool": "send_viewing_request",
+        "request_id": request_id,
+        "listing_id": listing_id,
+        "viewing_date": viewing_date,
+        "slot": slot,
+        "status": "pending",
+    }
+    return json.dumps(payload, ensure_ascii=False, indent=2)
+
+
+def create_calendar_event(request_id: int) -> str:
+    """
+    Tạo một calendar event nội bộ từ viewing request đã lưu trong SQLite.
+
+    Args:
+        request_id (int): Mã yêu cầu đặt lịch xem nhà.
+
+    Returns:
+        str: JSON string chứa thông tin event đã tạo.
+    """
+    request_row = get_viewing_request(request_id)
+    if request_row is None:
+        return f"LỖI: Không tìm thấy request_id={request_id}."
+
+    existing_event = get_calendar_event_for_request(request_id)
+    if existing_event is not None:
+        payload = {
+            "tool": "create_calendar_event",
+            "event_id": existing_event["event_id"],
+            "request_id": request_id,
+            "start_at": existing_event["start_at"],
+            "event_status": existing_event["event_status"],
+        }
+        return json.dumps(payload, ensure_ascii=False, indent=2)
+
+    start_at = f"{request_row['viewing_date']}T{request_row['slot']}:00"
+    event_id = create_event_for_request(
+        request_id=request_id,
+        title=f"Xem nhà listing {request_row['listing_id']}",
+        start_at=start_at,
+        event_status="tentative" if request_row["status"] == "pending" else "confirmed",
+    )
+    payload = {
+        "tool": "create_calendar_event",
+        "event_id": event_id,
+        "request_id": request_id,
+        "start_at": start_at,
+        "event_status": "tentative" if request_row["status"] == "pending" else "confirmed",
+    }
+    return json.dumps(payload, ensure_ascii=False, indent=2)
+
+
 # Danh sách các tool được đăng ký để Agent sử dụng
 AVAILABLE_TOOLS = {
     # "get_weather": get_weather,
     # "search_flights": search_flights,
     "search_rentals": search_rentals,
     "get_listing_details": get_listing_details,
+    "check_viewing_slots": check_viewing_slots,
+    "send_viewing_request": send_viewing_request,
+    "create_calendar_event": create_calendar_event,
 }
