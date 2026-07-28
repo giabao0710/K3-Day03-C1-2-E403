@@ -18,7 +18,7 @@ if sys.stdout.encoding != "utf-8":
 
 from prompts import CHATBOT_BASELINE_PROMPT, MAX_ITERATIONS, REACT_SYSTEM_PROMPT
 from providers import get_llm_provider
-from tools import AVAILABLE_TOOLS, SEARCH_CACHE
+from tools import AVAILABLE_TOOLS
 
 
 load_dotenv()
@@ -218,9 +218,9 @@ def run_react_agent(user_query: str, provider) -> dict[str, Any]:
                 trace_lines.append(f"Observation: {observation}")
                 print(f"Observation: {observation}")
             else:
-                consecutive_invalid_steps = 0
                 trace_lines.append(f"Action: {action_line}")
                 observation = execute_action(tool_name, arguments)
+                consecutive_invalid_steps = consecutive_invalid_steps + 1 if tool_name not in AVAILABLE_TOOLS else 0
                 trace_lines.append(f"Observation: {observation}")
                 print(f"Observation: {observation}")
 
@@ -243,26 +243,17 @@ def run_react_agent(user_query: str, provider) -> dict[str, Any]:
 
 def run_demo_cases(provider) -> None:
     tests = load_test_cases()
-    print(f"Da tai {len(tests)} test cases tu config/test_cases.json")
-
-    baseline_case = tests[0]["question"]
+    print(f"Đã tải {len(tests)} test cases từ config/test_cases.json")
 
     print("\n=== DEMO: BASELINE CHATBOT ===")
-    run_baseline_chatbot(baseline_case, provider)
+    for test in tests:
+        print(f"\n--- Case {test['id']}: {test['category']} ---")
+        run_baseline_chatbot(test["question"], provider)
 
-    print("=== DEMO: REACT AGENT ===")
-    run_react_agent(tests[2]["question"], provider)
-
-    listing_id = next(iter(SEARCH_CACHE), 123456789)
-    detail_case = f"Cho tôi xem chi tiết tin có listing_id {listing_id}."
-    booking_case = (
-        f"Đặt lịch xem listing_id {listing_id} vào ngày 2026-08-04 lúc 09:00 "
-        "cho Nguyen Van A, số 0901234567."
-    )
-    invalid_case = f"Kiểm tra lịch trống cho listing_id {listing_id} vào ngày 2026-02-30."
-    react_cases = [detail_case, booking_case, invalid_case, tests[11]["question"], tests[12]["question"], tests[13]["question"]]
-    for question in react_cases:
-        run_react_agent(question, provider)
+    print("\n=== DEMO: REACT AGENT ===")
+    for test in tests:
+        print(f"\n--- Case {test['id']}: {test['category']} ---")
+        run_react_agent(test["question"], provider)
 
 
 if __name__ == "__main__":
