@@ -21,16 +21,6 @@ CHOTOT_API_URL = "https://gateway.chotot.com/v1/public/ad-listing"
 REQUEST_TIMEOUT_SECONDS = 20
 SEARCH_CACHE = {}
 
-
-def _extract_furnishing(params: list[dict]) -> str:
-    for param in params:
-        if param.get("id") == "furnishing_rent":
-            value = param.get("value")
-            if isinstance(value, str):
-                return value
-    return "Không rõ"
-
-
 def _build_listing_summary(ad: dict) -> dict:
     list_id = ad.get("list_id")
     street_number = ad.get("street_number", "")
@@ -39,9 +29,6 @@ def _build_listing_summary(ad: dict) -> dict:
     area_name = ad.get("area_name") or ""
     region_name = ad.get("region_name_v3") or ad.get("region_name") or ""
     address_parts = [part.strip() for part in [street_number, street_name, ward_name, area_name, region_name] if part]
-    seller_info = ad.get("seller_info") or {}
-    seller_name = seller_info.get("full_name") or ad.get("full_name") or ad.get("account_name") or "Không rõ"
-
     return {
         "listing_id": list_id,
         "title": ad.get("subject", "Không có tiêu đề"),
@@ -56,45 +43,6 @@ def _is_valid_listing_id(listing_id: int) -> bool:
     return isinstance(listing_id, int) and listing_id > 0
 
 
-# def get_weather(location: str) -> str:
-#     """
-#     Tra cứu thời tiết hiện tại của một thành phố.
-    
-#     Args:
-#         location (str): Tên thành phố (Ví dụ: 'Hà Nội', 'TP.HCM', 'Đà Nẵng')
-        
-#     Returns:
-#         str: Thông tin thời tiết chi tiết
-#     """
-#     loc_lower = location.lower()
-#     if "hà nội" in loc_lower or "ha noi" in loc_lower:
-#         return "Thời tiết Hà Nội: 28°C, Nắng nhẹ, Độ ẩm 65%."
-#     elif "hồ chí minh" in loc_lower or "tp.hcm" in loc_lower or "hcm" in loc_lower:
-#         return "Thời tiết TP.HCM: 33°C, Nắng nóng, Có mây."
-#     elif "đà nẵng" in loc_lower or "da nang" in loc_lower:
-#         return "Thời tiết Đà Nẵng: 30°C, Gió nhẹ, Mát mẻ."
-#     else:
-#         return f"LỖI: Không tìm thấy dữ liệu thời tiết cho địa điểm '{location}'."
-
-
-# def search_flights(origin: str, destination: str) -> str:
-#     """
-#     Tra cứu chuyến bay giữa hai địa điểm.
-    
-#     Args:
-#         origin (str): Nơi đi (Ví dụ: 'TP.HCM')
-#         destination (str): Nơi đến (Ví dụ: 'Hà Nội')
-        
-#     Returns:
-#         str: Danh sách chuyến bay khả dụng và giá vé
-#     """
-#     return (
-#         f"Chuyến bay từ {origin} -> {destination} ngày mai:\n"
-#         f"1. VN123 (08:00) - Giá: 1,500,000 VNĐ (Còn vé)\n"
-#         f"2. VJ456 (14:30) - Giá: 1,200,000 VNĐ (Còn vé)"
-#     )
-
-
 def search_rentals(
     region_v2: int = 12000,
     category: int = 1050,
@@ -103,23 +51,7 @@ def search_rentals(
     property_types: str = "u,h",
     limit: int = 10,
 ) -> str:
-    """
-    Tìm danh sách phòng trọ / căn hộ cho thuê từ API public của Chợ Tốt.
-
-    Hàm này lưu toàn bộ payload theo `listing_id` trong SEARCH_CACHE để các tool
-    khác có thể dùng lại, nhưng chỉ trả về dữ liệu tóm tắt cho Agent.
-
-    Args:
-        region_v2 (int): Mã khu vực Chợ Tốt. Mặc định 12000 = Hà Nội.
-        category (int): Mã category. Mặc định 1050 = Phòng trọ.
-        min_price (int): Giá tối thiểu theo VND.
-        max_price (int): Giá tối đa theo VND.
-        property_types (str): Loại tin đăng, ví dụ "u,h".
-        limit (int): Số lượng kết quả tối đa cần lấy.
-
-    Returns:
-        str: JSON string chứa shortlist kết quả phù hợp cho ReAct Agent.
-    """
+    """Tìm danh sách phòng trọ từ API public của Chợ Tốt."""
     if not all(isinstance(value, int) for value in (region_v2, category, min_price, max_price, limit)):
         return "LỖI: region_v2, category, min_price, max_price và limit phải là số nguyên."
     if min_price < 0 or max_price < 0:
@@ -192,15 +124,7 @@ def search_rentals(
 
 
 def get_listing_details(listing_id: int) -> str:
-    """
-    Lấy thông tin chi tiết của một tin đăng theo listing_id.
-
-    Args:
-        listing_id (int): Mã tin đăng Chợ Tốt.
-
-    Returns:
-        str: JSON string chứa thông tin đầy đủ của listing.
-    """
+    """Lấy thông tin chi tiết của một tin đăng theo listing_id."""
     if not _is_valid_listing_id(listing_id):
         return "LỖI: listing_id phải là số nguyên dương."
 
@@ -217,16 +141,7 @@ def get_listing_details(listing_id: int) -> str:
 
 
 def check_viewing_slots(listing_id: int, viewing_date: str) -> str:
-    """
-    Kiểm tra các khung giờ còn trống để xem nhà cho một tin đăng.
-
-    Args:
-        listing_id (int): Mã tin đăng cần xem nhà.
-        viewing_date (str): Ngày xem nhà theo định dạng YYYY-MM-DD.
-
-    Returns:
-        str: JSON string chứa các khung giờ còn trống.
-    """
+    """Kiểm tra các khung giờ còn trống để xem nhà cho một tin đăng."""
     if not _is_valid_listing_id(listing_id):
         return "LỖI: listing_id phải là số nguyên dương."
     if not isinstance(viewing_date, str) or not viewing_date.strip():
@@ -257,19 +172,7 @@ def send_viewing_request(
     customer_name: str,
     customer_phone: str,
 ) -> str:
-    """
-    Gửi yêu cầu đặt lịch xem nhà và lưu trạng thái pending vào SQLite.
-
-    Args:
-        listing_id (int): Mã tin đăng cần xem nhà.
-        viewing_date (str): Ngày xem nhà theo định dạng YYYY-MM-DD.
-        slot (str): Khung giờ xem nhà, ví dụ 14:00.
-        customer_name (str): Tên khách cần đặt lịch.
-        customer_phone (str): Số điện thoại liên hệ của khách.
-
-    Returns:
-        str: JSON string chứa request_id và trạng thái yêu cầu.
-    """
+    """Gửi yêu cầu đặt lịch xem nhà và lưu trạng thái pending vào SQLite."""
     if not _is_valid_listing_id(listing_id):
         return "LỖI: listing_id phải là số nguyên dương."
     if not isinstance(viewing_date, str) or not viewing_date.strip():
@@ -312,15 +215,7 @@ def send_viewing_request(
 
 
 def create_calendar_event(request_id: int) -> str:
-    """
-    Tạo một calendar event nội bộ từ viewing request đã lưu trong SQLite.
-
-    Args:
-        request_id (int): Mã yêu cầu đặt lịch xem nhà.
-
-    Returns:
-        str: JSON string chứa thông tin event đã tạo.
-    """
+    """Tạo một calendar event nội bộ từ viewing request đã lưu trong SQLite."""
     if not isinstance(request_id, int) or request_id <= 0:
         return "LỖI: request_id phải là số nguyên dương."
 
@@ -362,8 +257,6 @@ def create_calendar_event(request_id: int) -> str:
 
 # Danh sách các tool được đăng ký để Agent sử dụng
 AVAILABLE_TOOLS = {
-    # "get_weather": get_weather,
-    # "search_flights": search_flights,
     "search_rentals": search_rentals,
     "get_listing_details": get_listing_details,
     "check_viewing_slots": check_viewing_slots,

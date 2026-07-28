@@ -1,0 +1,17 @@
+flowchart TD
+    A[User message] --> B{Need real-time listing or booking action?}
+    B -->|No| C[Baseline chatbot path]
+    C --> D[General advice / static knowledge answer]
+    B -->|Yes| E{Enough required info?}
+    E -->|No| F[Ask follow-up question]
+    E -->|Yes| G[ReAct agent path]
+    G --> H[Thought]
+    H --> I[Action: call supported tool]
+    I --> J[Observation]
+    J --> K{Done?}
+    K -->|No| H
+    K -->|Yes| L[Final Answer]
+    I --> M{Tool error?}
+    M -->|Yes| N[Safe fallback / explain error]
+    H --> O{Exceeded MAX_ITERATIONS or invalid loop?}
+    O -->|Yes| P[Guardrail stop]
