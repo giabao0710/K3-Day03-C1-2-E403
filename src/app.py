@@ -19,7 +19,16 @@ if sys.stdout.encoding != 'utf-8':
         pass
 
 # Import các thành phần từ file của Role 2, Role 3 & Multi-Provider Adapter
-from tools import AVAILABLE_TOOLS, get_weather, search_flights
+from tools import AVAILABLE_TOOLS
+
+def search_flights(origin: str, destination: str) -> str:
+    fn = AVAILABLE_TOOLS.get("search_flights")
+    if callable(fn):
+        try:
+            return fn(origin, destination)
+        except Exception:
+            pass
+    return f"Chức năng tra cứu chuyến bay chưa khả dụng cho {origin} -> {destination}."
 from prompts import CHATBOT_BASELINE_PROMPT, REACT_SYSTEM_PROMPT, MAX_ITERATIONS
 from providers import get_llm_provider
 
@@ -47,7 +56,9 @@ def run_baseline_chatbot(user_query: str, provider):
     
     # Gọi LLM Provider thực hiện sinh câu trả lời
     response = provider.generate(user_query, system_prompt=CHATBOT_BASELINE_PROMPT)
-    print(f"🤖 Chatbot trả lời:\n{response}")
+    response_text = response.strip()
+    print(f"🤖 Chatbot trả lời:\n{response_text}")
+    print(f"🏁 Final Answer: {response_text}\n")
 
 
 def run_react_agent(user_query: str, provider):
@@ -62,16 +73,33 @@ def run_react_agent(user_query: str, provider):
         print(f"\n--- 🔄 Vòng lặp ReAct (Step {step}/{MAX_ITERATIONS}) ---")
         
         if step == 1:
-            print("🧠 Thought: Câu hỏi này cần tra cứu thời tiết thời gian thực.")
-            print("🛠️ Action: get_weather['Hà Nội']")
-            
-            # Thực thi tool
-            obs = get_weather("Hà Nội")
+            print("🧠 Thought: Câu hỏi này cần tra cứu tin đăng cho thuê để ước lượng giá thuê.")
+            print("🛠️ Action: search_rentals[TP.HCM]")
+
+            # Thực thi tool search_rentals nếu có
+            fn = AVAILABLE_TOOLS.get("search_rentals")
+            if callable(fn):
+                try:
+                    obs = fn()
+                except Exception as e:
+                    obs = f"LỖI khi gọi search_rentals: {e}"
+            else:
+                obs = "Tool search_rentals chưa được cấu hình."
+
             print(f"👁️ Observation: {obs}")
-            
+
         elif step == 2:
-            print("🧠 Thought: Tôi đã có thông tin thời tiết Hà Nội, giờ tôi có thể tư vấn trang phục.")
-            print("🏁 Final Answer: Thời tiết Hà Nội hôm nay 28°C, nắng nhẹ. Bạn nên mặc áo phông thoáng mát!")
+            # Cố gắng tóm tắt kết quả nếu observation là JSON
+            try:
+                parsed = json.loads(obs)
+                total = parsed.get("total_found") or parsed.get("total") or len(parsed.get("results", []))
+                first = parsed.get("results", [])[0] if parsed.get("results") else None
+                summary = first.get("title") if first else "(không có kết quả chi tiết)"
+                print(f"🧠 Thought: Đã có danh sách tin thuê, tổng khoảng: {total} kết quả."
+                      )
+                print(f"🏁 Final Answer: Tìm được ~{total} kết quả; ví dụ: {summary}")
+            except Exception:
+                print("🏁 Final Answer: Đã tìm được một số tin cho thuê — xem output ở Observation.")
             break
             
     if step >= MAX_ITERATIONS:
