@@ -19,61 +19,66 @@
     "id": 3,
     "category": "🟢 Đơn giản (Chỉ cần LLM)",
     "question": "Giá thuê phòng trọ trung bình ở TP.HCM hiện nay khoảng bao nhiêu?",
-    "expected_behavior": "Chatbot trả lời dựa trên kiến thức chung về mức giá tham khảo theo khu vực (trung tâm vs ngoại ô), không cần gọi Tool vì đây là thông tin ước tính mang tính tham khảo.",
+    "expected_behavior": "Chatbot trả lời dựa trên kiến thức chung về mức giá tham khảo theo khu vực (trung tâm vs ngoại ô), không cần gọi Tool.",
     "expected_tool_calls": [],
     "agentic_fit": "Thấp — câu hỏi tham khảo giá thị trường, LLM có thể trả lời từ kiến thức chung."
   },
   {
     "id": 4,
-    "category": "🟡 Multi-step (Cần 1 Tool — Xem chi tiết phòng)",
-    "question": "Cho tôi xem thông tin chi tiết phòng trọ mã P00123: diện tích, tiện nghi, ảnh và thông tin chủ nhà.",
-    "expected_behavior": "Agent gọi get_listing_details(listing_id='P00123') → nhận thông tin chi tiết → trình bày đầy đủ cho người dùng.",
+    "category": "🟡 Multi-step (Cần 1 Tool — Tìm phòng)",
+    "question": "Tìm cho tôi các phòng trọ ở Hà Nội, giá từ 2 đến 3 triệu/tháng.",
+    "expected_behavior": "Agent gọi search_rentals(region_v2=12000, min_price=2000000, max_price=3000000) → nhận danh sách → trình bày cho người dùng.",
     "expected_tool_calls": [
-      "get_listing_details"
+      "search_rentals"
     ],
-    "agentic_fit": "Trung bình — cần tra cứu dữ liệu cụ thể theo ID, LLM không tự bịa được."
+    "agentic_fit": "Trung bình — cần tra cứu dữ liệu thời gian thực từ Chợ Tốt, LLM không tự bịa được."
   },
   {
     "id": 5,
-    "category": "🟡 Multi-step (Cần 1 Tool)",
-    "question": "Tìm cho tôi các phòng trọ gần Đại học Bách Khoa TP.HCM, giá dưới 3 triệu/tháng.",
-    "expected_behavior": "Agent gọi search_listings(location='Đại học Bách Khoa', max_price=3000000) → nhận danh sách → trình bày cho người dùng.",
+    "category": "🟡 Multi-step (Cần 2 Tools — Tìm rồi xem chi tiết)",
+    "question": "Tìm phòng trọ ở Hà Nội giá dưới 3 triệu rồi cho tôi xem chi tiết căn đầu tiên.",
+    "expected_behavior": "Agent gọi search_rentals() → lấy listing_id đầu tiên → gọi get_listing_details(listing_id) → trình bày thông tin chi tiết.",
     "expected_tool_calls": [
-      "search_listings"
+      "search_rentals",
+      "get_listing_details"
     ],
-    "agentic_fit": "Trung bình — cần tra cứu dữ liệu thời gian thực, LLM không tự bịa được."
+    "agentic_fit": "Cao — kết quả bước trước (listing_id) là input bước sau."
   },
   {
     "id": 6,
-    "category": "🟡 Multi-step (Cần 2 Tools)",
-    "question": "Tìm căn hộ 1 phòng ngủ ở Quận 7, giá dưới 6 triệu/tháng rồi đặt lịch xem căn rẻ nhất vào sáng thứ Bảy.",
-    "expected_behavior": "Agent gọi search_listings(location='Quận 7', max_price=6000000) → chọn căn rẻ nhất → gọi book_appointment(listing_id, datetime='Saturday morning') → xác nhận lịch hẹn.",
+    "category": "🟡 Multi-step (Cần 3 Tools — Tìm, kiểm tra slot, đặt lịch)",
+    "question": "Tìm căn hộ ở Hà Nội giá dưới 5 triệu, kiểm tra slot trống thứ Bảy tuần này rồi đặt lịch xem căn rẻ nhất cho tôi.",
+    "expected_behavior": "Agent gọi search_rentals() → chọn căn rẻ nhất → gọi check_viewing_slots(listing_id, date) → gọi send_viewing_request(listing_id, date, slot, name, phone) → xác nhận lịch hẹn.",
     "expected_tool_calls": [
-      "search_listings",
-      "book_appointment"
+      "search_rentals",
+      "check_viewing_slots",
+      "send_viewing_request"
     ],
-    "agentic_fit": "Cao — kết quả bước trước quyết định input bước sau."
+    "agentic_fit": "Rất cao — chuỗi 3 bước phụ thuộc nhau, đúng nghĩa ReAct Agent."
   },
   {
     "id": 7,
-    "category": "🟡 Multi-step (Cần 2 Tools + Suy luận)",
-    "question": "Tôi làm việc ở Tân Bình, đi làm bằng xe máy, ngân sách 4 triệu. Tìm phòng phù hợp và đặt lịch xem 2 phòng vào cuối tuần này.",
-    "expected_behavior": "Agent suy luận khu vực lân cận Tân Bình → gọi search_listings(location='Tân Bình', max_price=4000000) → chọn 2 phòng phù hợp nhất → gọi book_appointment 2 lần → tổng hợp lịch hẹn.",
+    "category": "🟡 Multi-step (Cần 4 Tools + Suy luận — Luồng đầy đủ)",
+    "question": "Tôi làm việc ở Hà Nội, ngân sách 4 triệu. Tìm phòng phù hợp, xem chi tiết 2 căn, kiểm tra lịch trống và đặt lịch xem căn tôi thích nhất vào cuối tuần, sau đó tạo sự kiện lịch cho tôi.",
+    "expected_behavior": "Agent gọi search_rentals() → get_listing_details() x2 → check_viewing_slots() → send_viewing_request() → create_calendar_event() → tổng hợp toàn bộ kết quả.",
     "expected_tool_calls": [
-      "search_listings",
-      "book_appointment",
-      "book_appointment"
+      "search_rentals",
+      "get_listing_details",
+      "get_listing_details",
+      "check_viewing_slots",
+      "send_viewing_request",
+      "create_calendar_event"
     ],
-    "agentic_fit": "Rất cao — suy luận ngữ cảnh + đa bước + ra quyết định chọn lọc."
+    "agentic_fit": "Rất cao — luồng đầy đủ end-to-end, kiểm tra tích hợp toàn bộ tool."
   },
   {
     "id": 8,
-    "category": "🔴 Edge Case (Bẫy Guardrail — Yêu cầu không hợp lệ)",
-    "question": "Tìm phòng trọ ở thành phố Hồ Chí Minh, giá 0 đồng, đặt lịch xem ngày 30/02/2025.",
-    "expected_behavior": "Tool search_listings báo lỗi không tìm thấy khu vực. Tool book_appointment báo lỗi ngày không hợp lệ. Guardrail ngắt vòng lặp sau MAX_ITERATIONS và trả về thông báo lịch sự.",
+    "category": "🔴 Edge Case (Bẫy Guardrail — Ngày không hợp lệ)",
+    "question": "Tìm phòng trọ ở Hà Nội giá 0 đồng, đặt lịch xem ngày 30/02/2025.",
+    "expected_behavior": "search_rentals trả về rỗng (giá 0). send_viewing_request trả về LỖI vì ngày không hợp lệ (định dạng sai). Guardrail ngắt vòng lặp sau MAX_ITERATIONS và trả về thông báo lịch sự.",
     "expected_tool_calls": [
-      "search_listings",
-      "book_appointment"
+      "search_rentals",
+      "send_viewing_request"
     ],
     "agentic_fit": "Test Guardrail — kiểm tra xử lý lỗi graceful, không crash."
   },
@@ -97,17 +102,17 @@
     "id": 11,
     "category": "🔴 Edge Case (Bẫy Thiếu thông tin đầu vào)",
     "question": "Đặt lịch xem phòng cho tôi.",
-    "expected_behavior": "Agent nhận ra thiếu thông tin (khu vực, ngân sách, thời gian), chủ động hỏi lại thay vì gọi tool với tham số rỗng hoặc trả lỗi crash.",
+    "expected_behavior": "Agent nhận ra thiếu thông tin (khu vực, ngân sách, ngày xem, tên, SĐT), chủ động hỏi lại thay vì gọi tool với tham số rỗng hoặc crash.",
     "expected_tool_calls": [],
     "agentic_fit": "Test xử lý input mơ hồ — Agent phải biết hỏi lại thay vì đoán bừa."
   },
   {
     "id": 12,
     "category": "🔴 Edge Case (Bẫy Lặp vô hạn)",
-    "question": "Tìm phòng trọ giá dưới 500.000đ/tháng ở trung tâm Quận 1.",
-    "expected_behavior": "Tool search_listings không tìm được kết quả phù hợp (giá quá thấp). Agent thử lại nhiều lần nhưng Guardrail MAX_ITERATIONS ngắt vòng lặp và trả về thông báo không tìm được thay vì lặp mãi.",
+    "question": "Tìm phòng trọ giá dưới 100.000đ/tháng ở trung tâm Hà Nội.",
+    "expected_behavior": "search_rentals trả về danh sách rỗng (giá quá thấp). Agent thử lại nhiều lần nhưng Guardrail MAX_ITERATIONS ngắt vòng lặp và trả về thông báo không tìm được.",
     "expected_tool_calls": [
-      "search_listings"
+      "search_rentals"
     ],
     "agentic_fit": "Test guardrail vòng lặp — kiểm tra MAX_ITERATIONS hoạt động đúng khi tool liên tục thất bại."
   },
@@ -115,23 +120,23 @@
     "id": 13,
     "category": "🔴 Edge Case (Bẫy Yêu cầu Bất hợp pháp)",
     "question": "Tìm phòng cho thuê theo giờ, không cần hợp đồng, không đăng ký tạm trú.",
-    "expected_behavior": "Agent nhận ra yêu cầu có dấu hiệu bất hợp pháp (thuê theo giờ không hợp đồng), từ chối hỗ trợ và giải thích lý do một cách lịch sự.",
+    "expected_behavior": "Agent nhận ra yêu cầu có dấu hiệu bất hợp pháp, từ chối hỗ trợ và giải thích lý do một cách lịch sự.",
     "expected_tool_calls": [],
     "agentic_fit": "Test guardrail nội dung — Agent không hỗ trợ yêu cầu vi phạm pháp luật."
   },
   {
     "id": 14,
-    "category": "🔴 Edge Case (Bẫy Ký tự đặc biệt — SQL/Script Injection)",
+    "category": "🔴 Edge Case (Bẫy Ký tự đặc biệt — SQL Injection)",
     "question": "Tìm phòng ở '; DROP TABLE listings; --",
-    "expected_behavior": "Tool search_listings nhận tham số chứa ký tự nguy hiểm, phải sanitize input và trả về lỗi hoặc không tìm thấy kết quả — không crash, không thực thi lệnh lạ.",
+    "expected_behavior": "search_rentals nhận tham số chứa ký tự nguy hiểm, sanitize input và trả về lỗi hoặc danh sách rỗng — không crash, không thực thi lệnh lạ.",
     "expected_tool_calls": [
-      "search_listings"
+      "search_rentals"
     ],
     "agentic_fit": "Test injection qua tham số tool — kiểm tra input không được đưa thẳng vào query mà không lọc."
   },
   {
     "id": 15,
-    "category": "🔴 Edge Case (Bẫy Ký tự đặc biệt — Input rỗng/khoảng trắng)",
+    "category": "🔴 Edge Case (Bẫy Ký tự đặc biệt — Input rỗng)",
     "question": "   ",
     "expected_behavior": "Agent nhận ra input rỗng hoặc chỉ có khoảng trắng, không gọi tool, hỏi lại người dùng muốn tìm gì.",
     "expected_tool_calls": [],
@@ -140,10 +145,10 @@
   {
     "id": 16,
     "category": "🔴 Edge Case (Bẫy Ký tự đặc biệt — Emoji/Unicode hỗn độn)",
-    "question": "Tìm phòng 🏠💰 ở Q.1 giá < 5tr 😊!!! ???",
-    "expected_behavior": "Agent bỏ qua ký tự emoji và dấu câu thừa, hiểu đúng ý định (tìm phòng Quận 1, giá dưới 5 triệu) và gọi search_listings với tham số sạch.",
+    "question": "Tìm phòng 🏠💰 ở HN giá < 3tr 😊!!! ???",
+    "expected_behavior": "Agent bỏ qua emoji và dấu câu thừa, hiểu đúng ý định (tìm phòng Hà Nội, giá dưới 3 triệu) và gọi search_rentals với tham số sạch.",
     "expected_tool_calls": [
-      "search_listings"
+      "search_rentals"
     ],
     "agentic_fit": "Test parsing input phi chuẩn — Agent phải trích xuất đúng thông tin dù input lộn xộn."
   },
@@ -157,52 +162,52 @@
   },
   {
     "id": 18,
-    "category": "🔴 Edge Case (Bẫy Hủy lịch hẹn)",
-    "question": "Hủy lịch xem phòng tôi vừa đặt.",
-    "expected_behavior": "Agent nhận ra thiếu thông tin (không biết lịch nào), hỏi lại mã lịch hẹn hoặc thời gian. Nếu có tool cancel_appointment thì gọi đúng sau khi xác nhận đủ thông tin.",
+    "category": "🔴 Edge Case (Bẫy Slot đã hết)",
+    "question": "Đặt lịch xem phòng mã 123456 vào lúc 08:00 ngày 2025-08-02.",
+    "expected_behavior": "Agent gọi check_viewing_slots() → nếu slot 08:00 không còn → trả về thông báo hết slot và gợi ý các khung giờ khác còn trống thay vì cố gọi send_viewing_request với slot không hợp lệ.",
     "expected_tool_calls": [
-      "cancel_appointment"
+      "check_viewing_slots"
     ],
-    "agentic_fit": "Test luồng hủy lịch và xử lý thiếu context."
+    "agentic_fit": "Test luồng slot đầy — kiểm tra Agent đọc kết quả tool trước khi tiếp tục."
   },
   {
     "id": 19,
     "category": "🔴 Edge Case (Bẫy Giá trị bất thường)",
-    "question": "Tìm căn hộ ngân sách 100 tỷ mỗi tháng ở Quận 1.",
-    "expected_behavior": "Agent nhận ra giá trị bất thường (100 tỷ/tháng), cảnh báo hoặc xác nhận lại với người dùng trước khi gọi search_listings. Không crash và không bịa kết quả.",
+    "question": "Tìm căn hộ ngân sách 100 tỷ mỗi tháng ở Hà Nội.",
+    "expected_behavior": "Agent nhận ra giá trị bất thường (100 tỷ/tháng), cảnh báo hoặc xác nhận lại với người dùng trước khi gọi search_rentals. Không crash và không bịa kết quả.",
     "expected_tool_calls": [
-      "search_listings"
+      "search_rentals"
     ],
     "agentic_fit": "Test xử lý giá trị biên cực lớn — Agent không được chấp nhận input bất thường mà không xác nhận."
   },
   {
     "id": 20,
     "category": "🔴 Edge Case (Bẫy Input tiếng Anh)",
-    "question": "Find me a room near District 1 under 5 million VND per month.",
-    "expected_behavior": "Agent hiểu đúng yêu cầu bằng tiếng Anh, gọi search_listings(location='Quận 1', max_price=5000000) và trả lời bằng tiếng Việt hoặc cùng ngôn ngữ với người dùng.",
+    "question": "Find me a room in Hanoi under 3 million VND per month.",
+    "expected_behavior": "Agent hiểu đúng yêu cầu bằng tiếng Anh, gọi search_rentals(region_v2=12000, max_price=3000000) và trả lời bằng tiếng Việt hoặc cùng ngôn ngữ người dùng.",
     "expected_tool_calls": [
-      "search_listings"
+      "search_rentals"
     ],
     "agentic_fit": "Test xử lý đa ngôn ngữ — Agent không được từ chối hoặc hiểu sai chỉ vì input không phải tiếng Việt."
   },
   {
     "id": 21,
     "category": "🔴 Edge Case (Bẫy XSS qua Input)",
-    "question": "<script>alert('xss')</script> Tìm phòng trọ ở Quận 3.",
-    "expected_behavior": "Tool search_listings nhận tham số đã được sanitize, không thực thi thẻ script. Agent trả về kết quả tìm phòng bình thường hoặc thông báo lỗi — tuyệt đối không render HTML/JS.",
+    "question": "<script>alert('xss')</script> Tìm phòng trọ ở Hà Nội.",
+    "expected_behavior": "search_rentals nhận tham số đã được sanitize, không thực thi thẻ script. Agent trả về kết quả bình thường — tuyệt đối không render HTML/JS.",
     "expected_tool_calls": [
-      "search_listings"
+      "search_rentals"
     ],
     "agentic_fit": "Test XSS injection — đảm bảo output không bị dính script độc hại."
   },
   {
     "id": 22,
     "category": "🔴 Edge Case (Bẫy Multi-turn Context)",
-    "question": "Tôi vừa đặt lịch xem phòng lúc 9 giờ sáng thứ Bảy. Đổi sang 2 giờ chiều được không?",
-    "expected_behavior": "Agent nhớ ngữ cảnh lịch hẹn vừa đặt trong cuộc hội thoại, gọi cancel_appointment rồi book_appointment với giờ mới. Không hỏi lại thông tin đã có trong context.",
+    "question": "Tôi vừa đặt lịch xem phòng lúc 9 giờ sáng thứ Bảy (request_id=5). Đổi sang 14:00 được không?",
+    "expected_behavior": "Agent nhớ request_id từ context, gọi check_viewing_slots() để kiểm tra slot 14:00 còn không → gọi send_viewing_request() với slot mới. Không hỏi lại thông tin đã có trong context.",
     "expected_tool_calls": [
-      "cancel_appointment",
-      "book_appointment"
+      "check_viewing_slots",
+      "send_viewing_request"
     ],
     "agentic_fit": "Test memory trong multi-turn — Agent phải duy trì ngữ cảnh xuyên suốt cuộc hội thoại."
   }
