@@ -6,6 +6,7 @@ Hỗ trợ chuyển đổi linh hoạt giữa các nhà cung cấp AI chỉ bằ
 import os
 import sys
 import json
+import re
 import requests
 from dotenv import load_dotenv
 
@@ -162,16 +163,120 @@ class OpenRouterProvider(BaseLLMProvider):
 class MockProvider(BaseLLMProvider):
     """Offline Mock Provider (Cho bài test không cần kết nối API)"""
     def generate(self, prompt: str, system_prompt: str = "") -> str:
+        if "Bạn là một ReAct Agent" in system_prompt:
+            return self._generate_react_response(prompt)
         text = prompt.lower()
-        if "thời tiết" in text and "hà nội" in text:
-            return "Thought: Cần tra cứu thời tiết Hà Nội.\nAction: get_weather['Hà Nội']"
-        if any(keyword in text for keyword in ["phòng trọ", "thuê nhà", "giá thuê", "tp.hcm", "tphcm", "sài gòn"]):
+        if any(keyword in text for keyword in ["nhà trọ", "căn hộ dịch vụ", "thuê lần đầu"]):
             return (
-                "Giá thuê phòng trọ trung bình ở TP.HCM hiện nay khoảng 2.0 - 3.5 triệu đồng/tháng, "
-                "tùy khu vực và tiện nghi. Khu trung tâm như Quận 1, 3 có thể cao hơn, trong khi Quận 12, Thủ Đức thường "
-                "rẻ hơn."
+                "Nhà trọ thường rẻ hơn, diện tích gọn và ít dịch vụ đi kèm; căn hộ dịch vụ thường có nội thất đầy đủ, "
+                "vệ sinh hoặc bảo vệ và chi phí cao hơn. Khi thuê lần đầu, bạn nên kiểm tra hợp đồng, tiền cọc, điện nước, "
+                "quy định ra vào và tình trạng phòng trước khi chốt."
             )
-        return "🤖 [Mock Provider]: Phản hồi giả lập offline cho bài test."
+        return "Mình là mock provider offline và hiện chỉ mô phỏng các tình huống trong bài lab."
+
+    def _generate_react_response(self, prompt: str) -> str:
+        normalized = prompt.lower()
+        user_query_match = re.search(r"Câu hỏi người dùng:\s*(.+)", prompt)
+        user_query = user_query_match.group(1).strip() if user_query_match else prompt.strip()
+
+        if "case_guardrail_loop" in normalized:
+            return "Thought: Tôi sẽ thử một action không hợp lệ.\nAction: unknown_tool[]"
+
+        last_observation = ""
+        last_tool_match = list(re.finditer(r'Observation:\s*(\{[\s\S]*?"tool":\s*"[^"]+"[\s\S]*?\})', prompt))
+        if last_tool_match:
+            last_observation = last_tool_match[-1].group(1).strip()
+        else:
+            last_error_match = list(re.finditer(r"Observation:\s*(LỖI:[^\n]+)", prompt))
+            if last_error_match:
+                last_observation = last_error_match[-1].group(1).strip()
+
+        listing_id_match = re.search(r"(?:listing_id|tin|mã)\D*(\d{4,})", user_query, flags=re.IGNORECASE)
+        listing_id = listing_id_match.group(1) if listing_id_match else "123456789"
+        date_match = re.search(r"(20\d{2}-\d{2}-\d{2})", user_query)
+        viewing_date = date_match.group(1) if date_match else "2026-08-03"
+        slot_match = re.search(r"(\d{2}:\d{2})", user_query)
+        slot = slot_match.group(1) if slot_match else "09:00"
+        phone_match = re.search(r"(0\d{8,10})", user_query)
+        customer_phone = phone_match.group(1) if phone_match else "0901234567"
+        customer_name = "Nguyen Van A"
+        if "tran thi b" in normalized:
+            customer_name = "Tran Thi B"
+        elif "nguyen van a" in normalized:
+            customer_name = "Nguyen Van A"
+
+        if ("chi tiết" in normalized or "xem tin" in normalized) and "Observation:" in prompt and "LỖI:" not in prompt:
+            return (
+                "Thought: Tôi đã có đủ chi tiết của tin đăng để tóm tắt cho người dùng.\n"
+                f"Final Answer: Tin {listing_id} đã có chi tiết đầy đủ về giá, diện tích, mô tả, ảnh và thông tin người đăng. "
+                "Nếu bạn muốn, mình có thể kiểm tra lịch trống để đặt lịch xem nhà tiếp."
+            )
+
+        if not last_observation:
+            if "chi tiết" in normalized or "xem tin" in normalized:
+                return (
+                    "Thought: Tôi đã có listing_id nên cần lấy chi tiết tin đăng.\n"
+                    f"Action: get_listing_details[{listing_id}]"
+                )
+            if "lịch trống" in normalized or "khung giờ" in normalized:
+                return (
+                    "Thought: Tôi cần kiểm tra các slot còn trống cho listing đã chọn.\n"
+                    f"Action: check_viewing_slots[{listing_id}, \"{viewing_date}\"]"
+                )
+            if "đặt lịch" in normalized:
+                return (
+                    "Thought: Tôi cần kiểm tra slot trước khi gửi yêu cầu đặt lịch.\n"
+                    f"Action: check_viewing_slots[{listing_id}, \"{viewing_date}\"]"
+                )
+            return (
+                "Thought: Tôi cần tìm các tin cho thuê phù hợp với ngân sách của khách.\n"
+                "Action: search_rentals[12000, 1050, 1000000, 2000000, \"u,h\", 5]"
+            )
+
+        if "LỖI:" in last_observation:
+            return (
+                "Thought: Tool vừa báo lỗi nên tôi cần dừng và giải thích rõ ràng cho người dùng.\n"
+                f"Final Answer: {last_observation}"
+            )
+
+        if '"tool": "search_rentals"' in last_observation:
+            return (
+                "Thought: Tôi đã có danh sách tin phù hợp để tóm tắt cho người dùng.\n"
+                "Final Answer: Mình đã tìm được một số tin phù hợp trong tầm giá 1-2 triệu. "
+                "Bạn có thể chọn một listing_id từ kết quả để mình xem chi tiết hoặc kiểm tra lịch trống."
+            )
+
+        if '"tool": "check_viewing_slots"' in last_observation:
+            if slot not in last_observation:
+                available_slot_match = re.search(r'"available_slots":\s*\[\s*"([^"]+)"', last_observation)
+                slot = available_slot_match.group(1) if available_slot_match else "09:00"
+            if "đặt lịch" in normalized:
+                return (
+                    "Thought: Slot còn trống nên tôi có thể gửi yêu cầu xem nhà ngay.\n"
+                    f"Action: send_viewing_request[{listing_id}, \"{viewing_date}\", \"{slot}\", "
+                    f"\"{customer_name}\", \"{customer_phone}\"]"
+                )
+            return (
+                "Thought: Tôi đã có danh sách lịch trống để phản hồi cho người dùng.\n"
+                f"Final Answer: Tin {listing_id} còn trống các khung giờ trong ngày {viewing_date}. "
+                "Nếu bạn muốn chốt một giờ cụ thể, mình có thể gửi yêu cầu đặt lịch ngay."
+            )
+
+        if '"tool": "send_viewing_request"' in last_observation:
+            request_id_match = re.search(r'"request_id":\s*(\d+)', last_observation)
+            request_id = request_id_match.group(1) if request_id_match else "1"
+            return (
+                "Thought: Yêu cầu đã được tạo, tôi cần tạo luôn calendar event nội bộ.\n"
+                f"Action: create_calendar_event[{request_id}]"
+            )
+
+        if '"tool": "create_calendar_event"' in last_observation:
+            return (
+                "Thought: Tôi đã có đủ thông tin để xác nhận lịch xem nhà.\n"
+                "Final Answer: Đã tạo yêu cầu xem nhà thành công, trạng thái hiện là pending và sự kiện lịch nội bộ cũng đã được tạo."
+            )
+
+        return "Thought: Tôi đã có đủ thông tin để trả lời.\nFinal Answer: Mình đã hoàn tất yêu cầu."
 
 
 def get_llm_provider(provider_name: str = None) -> BaseLLMProvider:

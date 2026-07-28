@@ -1,0 +1,515 @@
+<!doctype html>
+<html lang="vi">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Trợ Lý Tìm Nhà Trọ</title>
+    <style>
+        :root {
+            color-scheme: light;
+            --bg: #f3ebde;
+            --panel: rgba(255, 253, 248, 0.96);
+            --ink: #1f2933;
+            --muted: #6b7280;
+            --line: #dccfbe;
+            --accent: #0f766e;
+            --accent-soft: #dff4f1;
+            --user: #f4ebe1;
+            --error: #fff1f2;
+        }
+
+        * {
+            box-sizing: border-box;
+        }
+
+        body {
+            margin: 0;
+            min-height: 100vh;
+            background: linear-gradient(180deg, #ede3d5 0%, var(--bg) 100%);
+            color: var(--ink);
+            font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
+        }
+
+        .shell {
+            max-width: 920px;
+            margin: 0 auto;
+            padding: 24px 14px 40px;
+        }
+
+        .hero {
+            margin-bottom: 18px;
+        }
+
+        .hero h1 {
+            margin: 0 0 8px;
+            font-size: 2rem;
+        }
+
+        .hero p {
+            margin: 0;
+            color: var(--muted);
+        }
+
+        .chat-panel {
+            background: var(--panel);
+            border: 1px solid var(--line);
+            border-radius: 24px;
+            box-shadow: 0 16px 40px rgba(88, 62, 30, 0.08);
+            padding: 18px;
+        }
+
+        .messages {
+            display: flex;
+            flex-direction: column;
+            gap: 14px;
+            margin-bottom: 18px;
+        }
+
+        .message {
+            max-width: 94%;
+            padding: 14px 16px;
+            border-radius: 18px;
+            border: 1px solid var(--line);
+        }
+
+        .message.agent {
+            background: #fff;
+            align-self: flex-start;
+        }
+
+        .message.user {
+            background: var(--user);
+            align-self: flex-end;
+        }
+
+        .message.error {
+            background: var(--error);
+            border-color: #fecdd3;
+        }
+
+        .message p {
+            margin: 0;
+            line-height: 1.55;
+        }
+
+        .message-label {
+            display: block;
+            margin-bottom: 6px;
+            font-size: 0.78rem;
+            color: var(--muted);
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+        }
+
+        .listing-grid {
+            display: grid;
+            gap: 12px;
+            margin-top: 10px;
+        }
+
+        .listing-card,
+        .detail-card,
+        .slot-card,
+        .request-card,
+        .inline-card {
+            background: #fff;
+            border: 1px solid var(--line);
+            border-radius: 16px;
+            padding: 14px;
+        }
+
+        .listing-card h3,
+        .detail-card h3 {
+            margin: 0 0 10px;
+            font-size: 1rem;
+        }
+
+        .meta {
+            display: grid;
+            gap: 6px;
+            color: var(--muted);
+            font-size: 0.95rem;
+        }
+
+        .meta strong {
+            color: var(--ink);
+        }
+
+        .actions {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+            margin-top: 12px;
+        }
+
+        .field {
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+            margin-bottom: 12px;
+        }
+
+        .field label {
+            font-size: 0.9rem;
+            font-weight: 600;
+        }
+
+        input,
+        select,
+        button {
+            border-radius: 12px;
+            border: 1px solid var(--line);
+            padding: 11px 12px;
+            font: inherit;
+        }
+
+        input,
+        select {
+            background: #fff;
+        }
+
+        button {
+            background: var(--accent);
+            color: #fff;
+            border-color: var(--accent);
+            cursor: pointer;
+            transition: transform 120ms ease, box-shadow 120ms ease;
+        }
+
+        button:hover {
+            transform: translateY(-1px);
+            box-shadow: 0 10px 20px rgba(15, 118, 110, 0.18);
+        }
+
+        .ghost-button {
+            background: var(--accent-soft);
+            color: var(--accent);
+            border-color: #b7e5df;
+        }
+
+        .chat-input-bar {
+            display: grid;
+            grid-template-columns: 1fr auto;
+            gap: 10px;
+            padding-top: 14px;
+            border-top: 1px solid var(--line);
+        }
+
+        .chat-input-bar input {
+            width: 100%;
+        }
+
+        .chat-input-bar.is-loading input,
+        .chat-input-bar.is-loading button {
+            opacity: 0.7;
+            cursor: not-allowed;
+        }
+
+        .typing-bubble {
+            display: none;
+            align-self: flex-start;
+            max-width: 180px;
+            padding: 14px 16px;
+            border-radius: 18px;
+            border: 1px solid var(--line);
+            background: #fff;
+        }
+
+        .typing-bubble.is-visible {
+            display: block;
+        }
+
+        .typing-dots {
+            display: inline-flex;
+            gap: 6px;
+            align-items: center;
+        }
+
+        .typing-dots span {
+            width: 8px;
+            height: 8px;
+            border-radius: 999px;
+            background: var(--accent);
+            opacity: 0.3;
+            animation: pulse 1s infinite ease-in-out;
+        }
+
+        .typing-dots span:nth-child(2) {
+            animation-delay: 0.15s;
+        }
+
+        .typing-dots span:nth-child(3) {
+            animation-delay: 0.3s;
+        }
+
+        @keyframes pulse {
+            0%, 80%, 100% {
+                transform: scale(0.9);
+                opacity: 0.25;
+            }
+            40% {
+                transform: scale(1.15);
+                opacity: 1;
+            }
+        }
+
+        .helper-box {
+            margin-bottom: 14px;
+            padding: 14px;
+            border: 1px dashed var(--line);
+            border-radius: 16px;
+            background: rgba(255, 255, 255, 0.7);
+            color: var(--muted);
+        }
+
+        .helper-box strong {
+            color: var(--ink);
+        }
+
+        @media (max-width: 720px) {
+            .chat-input-bar {
+                grid-template-columns: 1fr;
+            }
+
+            .message {
+                max-width: 100%;
+            }
+        }
+    </style>
+</head>
+<body>
+    <main class="shell">
+        <header class="hero">
+            <h1>Trợ Lý Tìm &amp; Đặt Lịch Xem Nhà Trọ</h1>
+            <p>Giao diện chính chỉ là chat. Tìm phòng, xem chi tiết, kiểm tra lịch trống và gửi yêu cầu xem nhà đều diễn ra ngay trong luồng hội thoại.</p>
+        </header>
+
+        <section class="chat-panel">
+            <div class="helper-box">
+                <strong>Gợi ý:</strong> Nhắn như <em>Tìm phòng 1.5 đến 2 triệu</em>. Sau khi chọn tin, khung kiểm tra lịch và gửi yêu cầu sẽ hiện ngay trong chat.
+            </div>
+
+            <div class="messages" id="messages">
+                {% for message in messages %}
+                    {% set is_error = message.kind == "text" and message.text.startswith("LỖI:") %}
+                    <article class="message {{ message.role }}{% if is_error %} error{% endif %}">
+                        <span class="message-label">{{ "Bạn" if message.role == "user" else "Agent" }}</span>
+
+                        {% if message.kind == "text" %}
+                            <p>{{ message.text }}</p>
+
+                        {% elif message.kind == "listings" %}
+                            <p>Dưới đây là các lựa chọn phù hợp:</p>
+                            <div class="listing-grid">
+                                {% for item in message.results %}
+                                    <div class="listing-card">
+                                        <h3>{{ item.title }}</h3>
+                                        <div class="meta">
+                                            <span><strong>Giá:</strong> {{ item.price_text }}</span>
+                                            <span><strong>Diện tích:</strong> {{ item.area_m2 }} m²</span>
+                                            <span><strong>Địa chỉ:</strong> {{ item.address }}</span>
+                                            <span><strong>Trạng thái:</strong> {{ item.status }}</span>
+                                        </div>
+                                        <div class="actions">
+                                            <form method="post" action="{{ url_for('details') }}">
+                                                <input type="hidden" name="listing_id" value="{{ item.listing_id }}">
+                                                <button type="submit" class="ghost-button">Xem chi tiết</button>
+                                            </form>
+                                        </div>
+                                    </div>
+                                {% endfor %}
+                            </div>
+
+                        {% elif message.kind == "details" %}
+                            <div class="detail-card">
+                                <h3>{{ message.details.title }}</h3>
+                                <div class="meta">
+                                    <span><strong>Mã tin:</strong> {{ message.details.listing_id }}</span>
+                                    <span><strong>Giá:</strong> {{ message.details.price_text }}</span>
+                                    <span><strong>Diện tích:</strong> {{ message.details.area_m2 }} m²</span>
+                                    <span><strong>Địa chỉ:</strong> {{ message.details.address }}</span>
+                                    <span><strong>Nội thất:</strong> {{ message.details.furnishing }}</span>
+                                    <span><strong>Liên hệ:</strong> {{ message.details.contact_name }}</span>
+                                    <span><strong>Trạng thái:</strong> {{ message.details.status }}</span>
+                                    {% if message.details.rating %}
+                                        <span><strong>Đánh giá tin:</strong> {{ message.details.rating }}/5{% if message.details.rating_count %} ({{ message.details.rating_count }} lượt){% endif %}</span>
+                                    {% endif %}
+                                    {% if message.details.seller_rating %}
+                                        <span><strong>Đánh giá người đăng:</strong> {{ message.details.seller_rating }}/5{% if message.details.seller_rating_count %} ({{ message.details.seller_rating_count }} lượt){% endif %}</span>
+                                    {% endif %}
+                                    {% if message.details.description %}
+                                        <span><strong>Mô tả:</strong> {{ message.details.description }}</span>
+                                    {% endif %}
+                                </div>
+                                <div class="actions">
+                                    <div class="inline-card" style="width: 100%;">
+                                        <form method="post" action="{{ url_for('slots') }}">
+                                            <input type="hidden" name="listing_id" value="{{ message.details.listing_id }}">
+                                            <div class="field">
+                                                <label for="viewing_date_{{ message.details.listing_id }}">Ngày xem nhà</label>
+                                                <input
+                                                    id="viewing_date_{{ message.details.listing_id }}"
+                                                    name="viewing_date"
+                                                    type="date"
+                                                    min="{{ min_viewing_date }}"
+                                                    required
+                                                >
+                                            </div>
+                                            <button type="submit">Kiểm tra lịch trống</button>
+                                        </form>
+                                    </div>
+                                </div>
+                            </div>
+
+                        {% elif message.kind == "slots" %}
+                            <div class="slot-card">
+                                <p><strong>Tin đang đặt lịch:</strong> {{ message.listing_title or ("Tin #" ~ message.listing_id) }}</p>
+                                <p><strong>Ngày xem:</strong> {{ message.viewing_date }}</p>
+                                {% if message.available_slots %}
+                                    <p><strong>Khung giờ trống:</strong> {{ message.available_slots | join(", ") }}</p>
+                                    <div class="actions">
+                                        <div class="inline-card" style="width: 100%;">
+                                            <form method="post" action="{{ url_for('create_request') }}">
+                                                <input type="hidden" name="listing_id" value="{{ message.listing_id }}">
+                                                <input type="hidden" name="viewing_date" value="{{ message.viewing_date }}">
+                                                <div class="field">
+                                                    <label for="slot_{{ message.listing_id }}_{{ loop.index }}">Khung giờ</label>
+                                                    <select id="slot_{{ message.listing_id }}_{{ loop.index }}" name="slot" required>
+                                                        {% for slot in message.available_slots %}
+                                                            <option value="{{ slot }}">{{ slot }}</option>
+                                                        {% endfor %}
+                                                    </select>
+                                                </div>
+                                                <div class="field">
+                                                    <label for="customer_name_{{ message.listing_id }}_{{ loop.index }}">Tên người xem</label>
+                                                    <input id="customer_name_{{ message.listing_id }}_{{ loop.index }}" name="customer_name" type="text" placeholder="Nguyễn Văn A" required>
+                                                </div>
+                                                <div class="field">
+                                                    <label for="customer_phone_{{ message.listing_id }}_{{ loop.index }}">Số điện thoại</label>
+                                                    <input id="customer_phone_{{ message.listing_id }}_{{ loop.index }}" name="customer_phone" type="text" placeholder="0900000000" required>
+                                                </div>
+                                                <button type="submit">Gửi yêu cầu xem nhà</button>
+                                            </form>
+                                        </div>
+                                    </div>
+                                {% else %}
+                                    <p>Hiện chưa còn khung giờ trống trong ngày này.</p>
+                                {% endif %}
+                            </div>
+
+                        {% elif message.kind == "request" %}
+                            <div class="request-card">
+                                <p><strong>Yêu cầu xem nhà đã được gửi.</strong></p>
+                                <div class="meta">
+                                    <span><strong>Request ID:</strong> {{ message.payload.request_id }}</span>
+                                    <span><strong>Mã tin:</strong> {{ message.payload.listing_id }}</span>
+                                    <span><strong>Ngày:</strong> {{ message.payload.viewing_date }}</span>
+                                    <span><strong>Khung giờ:</strong> {{ message.payload.slot }}</span>
+                                    <span><strong>Trạng thái booking:</strong> {{ message.payload.status }}</span>
+                                </div>
+                            </div>
+
+                        {% elif message.kind == "calendar" %}
+                            <div class="request-card">
+                                <p><strong>Đã tạo lịch theo dõi booking.</strong></p>
+                                <div class="meta">
+                                    <span><strong>Event ID:</strong> {{ message.payload.event_id }}</span>
+                                    <span><strong>Request ID:</strong> {{ message.payload.request_id }}</span>
+                                    <span><strong>Thời gian:</strong> {{ message.payload.start_at }}</span>
+                                    <span><strong>Trạng thái calendar:</strong> {{ message.payload.event_status }}</span>
+                                </div>
+                            </div>
+                        {% endif %}
+                    </article>
+                {% endfor %}
+
+                <article class="typing-bubble" id="typingBubble" aria-live="polite" aria-hidden="true">
+                    <span class="message-label">Agent</span>
+                    <div class="typing-dots" aria-label="Đang trả lời">
+                        <span></span>
+                        <span></span>
+                        <span></span>
+                    </div>
+                </article>
+            </div>
+
+            <form class="chat-input-bar" id="chatForm" method="post" action="{{ url_for('chat') }}">
+                <input
+                    id="chatInput"
+                    type="text"
+                    name="message"
+                    placeholder="Nhắn như: Tìm phòng 1.5 đến 2 triệu"
+                    autocomplete="off"
+                    required
+                >
+                <button id="chatSubmit" type="submit">Gửi</button>
+            </form>
+        </section>
+    </main>
+    <script>
+        (() => {
+            const form = document.getElementById("chatForm");
+            const input = document.getElementById("chatInput");
+            const submitButton = document.getElementById("chatSubmit");
+            const typingBubble = document.getElementById("typingBubble");
+            const messages = document.getElementById("messages");
+
+            if (!form || !input || !submitButton || !typingBubble || !messages) {
+                return;
+            }
+
+            const scrollToBottom = () => {
+                window.scrollTo({ top: document.body.scrollHeight, behavior: "smooth" });
+            };
+
+            scrollToBottom();
+
+            let pending = false;
+
+            form.addEventListener("submit", async (event) => {
+                event.preventDefault();
+                if (pending) {
+                    return;
+                }
+
+                const content = input.value.trim();
+                if (!content) {
+                    input.focus();
+                    return;
+                }
+
+                pending = true;
+                form.classList.add("is-loading");
+                input.setAttribute("readonly", "readonly");
+                submitButton.setAttribute("disabled", "disabled");
+                typingBubble.classList.add("is-visible");
+                typingBubble.setAttribute("aria-hidden", "false");
+                scrollToBottom();
+
+                try {
+                    const response = await fetch(form.action, {
+                        method: "POST",
+                        body: new FormData(form),
+                        headers: {
+                            "X-Requested-With": "fetch",
+                        },
+                    });
+
+                    const html = await response.text();
+                    document.open();
+                    document.write(html);
+                    document.close();
+                } catch (error) {
+                    pending = false;
+                    form.classList.remove("is-loading");
+                    input.removeAttribute("readonly");
+                    submitButton.removeAttribute("disabled");
+                    typingBubble.classList.remove("is-visible");
+                    typingBubble.setAttribute("aria-hidden", "true");
+                    input.focus();
+                }
+            });
+        })();
+    </script>
+</body>
+</html>

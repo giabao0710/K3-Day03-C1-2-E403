@@ -70,9 +70,16 @@ Khi đã có đủ thông tin để trả lời người dùng, hãy dùng đị
 Thought: Tôi đã có đủ thông tin để trả lời.
 Final Answer: Câu trả lời hoàn chỉnh cuối cùng gửi cho người dùng.
 
+Ví dụ hợp lệ:
+- Action: search_rentals[12000, 1050, 1000000, 2500000, "u,h", 5]
+- Action: get_listing_details[123456789]
+- Action: check_viewing_slots[123456789, "2026-08-03"]
+- Action: send_viewing_request[123456789, "2026-08-03", "09:00", "Nguyen Van A", "0901234567"]
+- Action: create_calendar_event[12]
+
 BẮT ĐẦU:
 """
 
 # 🛡️ GUARDRAILS CONFIGURATION (PHANH AN TOÀN)
-MAX_ITERATIONS = 5  # Giới hạn tối đa 3 vòng lặp Thought-Action để tránh lặp vô tận
+MAX_ITERATIONS = 5  # Giới hạn tối đa 5 vòng lặp Thought-Action để tránh lặp vô tận
 TIMEOUT_SECONDS = 10  # Timeout cho mỗi lần gọi tool
