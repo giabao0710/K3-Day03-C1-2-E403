@@ -1,32 +1,33 @@
 # 📊 BÁO CÁO GIÁM SÁT & ĐÁNH GIÁ (OBSERVABILITY TRACE LOGS)
 *Dành cho Role 5: Observability & Reviewer*
+*Đề tài lựa chọn*: **Đề 10 - Trợ Lý Tìm & Đặt Lịch Xem Nhà Trọ / Căn Hộ Cho Thuê**
 
 ---
 
-## 🎯 1. BẢNG CHẤM ĐIỂM AGENTIC FIT (SCORING MATRIX)
+## 🎯 1. BẢNG CHẤM ĐIỂM AGENTIC FIT (SCORING MATRIX - MỐC 1)
 
-| Tiêu chí | Điểm (1-5) | Lý do đánh giá |
+| Tiêu chí | Điểm (1-5) | Lý do đánh giá bài toán Đề 10 |
 | :--- | :---: | :--- |
-| 🧠 **Multi-step Reasoning** | `4/5` | Cần suy luận từ tra cứu thời tiết đến chọn trang phục. |
-| 🛠️ **Tool Interaction** | `5/5` | Cần tra cứu dữ liệu thời gian thực qua API thời tiết/chuyến bay. |
-| 🔀 **Dynamic Decision** | `4/5` | Kết quả bước trước quyết định hành động bước sau. |
-| ⏳ **Long Horizon** | `3/5` | Quy trình gồm 2-3 bước xử lý ngắn. |
-| **TỔNG ĐIỂM FIT** | **16/20** | **KẾT LUẬN: BÀI TOÁN RẤT NÊN DÙNG REACT AGENT!** |
+| 🧠 **Multi-step Reasoning** | `5/5` | Cần phân tích yêu cầu thuê (khu vực, mức giá, tiện ích) ➔ Lọc phòng ➔ Kiểm tra lịch trống của chủ nhà ➔ Sắp xếp lịch hẹn phù hợp. |
+| 🛠️ **Tool Interaction** | `5/5` | Bắt buộc tương tác với dữ liệu thực tế qua Tools: tra cứu danh sách phòng trọ (`search_apartments`), kiểm tra lịch rảnh (`check_viewing_schedule`), và thực hiện đặt lịch xem nhà (`book_viewing_slot`). |
+| 🔀 **Dynamic Decision** | `4/5` | Kết quả từ bước tra cứu quyết định bước tiếp theo (VD: Nếu phòng mong muốn đã hết lịch xem cuối tuần, Agent phải linh hoạt gợi ý khung giờ khác hoặc căn hộ tương đương ở cùng khu vực). |
+| ⏳ **Long Horizon** | `4/5` | Quy trình gồm nhiều bước liên tiếp: Tìm kiếm ➔ Lọc tiêu chí ➔ Xác nhận tình trạng ➔ Đặt lịch xem ➔ Gửi xác nhận đặt lịch. |
+| **TỔNG ĐIỂM FIT** | **18/20** | **KẾT LUẬN: BÀI TOÁN RẤT NÊN DÙNG REACT AGENT!** (Chatbot thông thường không có công cụ tra cứu dữ liệu thời gian thực hay thực hiện thao tác đặt lịch). |
 
 ---
 
-## 🔍 2. SO SÁNH PHẢN HỒI (TEST CASE #3)
+## 🔍 2. SO SÁNH PHẢN HỒI (TEST CASE #3 - ĐỀ TÀI 10)
 
-**Câu hỏi**: *"Thời tiết ở Hà Nội hôm nay thế nào và tôi nên mặc gì đi chơi?"*
+**Câu hỏi**: *"Tôi muốn tìm phòng trọ khu vực Cầu Giấy giá dưới 5 triệu có điều hòa, và đặt lịch xem phòng vào chiều thứ 7 này."*
 
-### 🤖 Chatbot Baseline:
-* **Phản hồi**: *"Tôi không có truy cập Internet thời gian thực nên không biết thời tiết hôm nay ở Hà Nội."*
-* **Nhận xét**: An toàn nhưng không giải quyết được nhu cầu thực tế của người dùng.
+### 🤖 Chatbot Baseline (Sẽ cập nhật ở Mốc 2):
+* **Phản hồi**: *(Chờ Role 4 chạy Baseline Chatbot để ghi nhận)*
+* **Nhận xét**: *(Chờ cập nhật)*
 
-### 🧠 ReAct Agent:
-* **Thought 1**: Cần tra cứu thời tiết Hà Nội.
-* **Action 1**: `get_weather['Hà Nội']`
-* **Observation 1**: `Thời tiết Hà Nội: 28°C, Nắng nhẹ, Độ ẩm 65%.`
-* **Thought 2**: Đã có thông tin 28°C nắng nhẹ, đưa ra lời khuyên trang phục.
-* **Final Answer**: *"Thời tiết Hà Nội hôm nay 28°C, nắng nhẹ. Bạn nên mặc quần áo thoáng mát!"*
-* **Nhận xét**: Hoàn thành xuất sắc nhiệm vụ nhờ sự kết hợp giữa suy luận và công cụ.
+### 🧠 ReAct Agent (Sẽ cập nhật ở Mốc 3):
+* **Thought 1**: *(Chờ Role 4 chạy ReAct Agent để trích xuất trace log)*
+* **Action 1**: 
+* **Observation 1**: 
+* **Final Answer**: 
+* **Nhận xét**: 
+
