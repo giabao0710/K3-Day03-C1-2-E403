@@ -1,0 +1,46 @@
+%% =========================================================
+%%  HYBRID DECISION FLOWCHART — Đề 10: Trợ Lý Đặt Lịch Xem Nhà Trọ
+%%  Mô tả: Khi nào đi đường Chatbot, khi nào đi đường ReAct Agent
+%% =========================================================
+flowchart TD
+
+    %% ─── ENTRY ───────────────────────────────────────────
+    START([🚀 Người dùng gửi câu hỏi]) --> CLASSIFY{{"🧭 PHÂN LOẠI YÊU CẦU\n(Question Classifier)"}}
+
+    %% ─── CHATBOT PATH ─────────────────────────────────────
+    CLASSIFY -->|Câu đơn giản / Không cần dữ liệu thực| CB_PATH["🤖 CHATBOT PATH\n(LLM Baseline — không Tool)"]
+    CB_PATH --> CB_EXAMPLES["📋 Ví dụ câu vào:\n• 'Thuê nhà trọ cần chuẩn bị gì?'\n• 'Hợp đồng thuê nhà có những điều khoản nào?'\n• 'Phong thủy phòng trọ như thế nào?'"]
+    CB_EXAMPLES --> CB_GEN["✍️ LLM sinh câu trả lời\ntừ kiến thức tĩnh (Static Knowledge)"]
+    CB_GEN --> CB_REPLY(["💬 Trả lời trực tiếp cho người dùng"])
+
+    %% ─── REACT AGENT PATH ─────────────────────────────────
+    CLASSIFY -->|Câu phức tạp / Cần tra cứu / Đa bước| REACT_PATH["🧠 REACT AGENT PATH\n(Thought → Action → Observation Loop)"]
+    REACT_PATH --> REACT_EXAMPLES["📋 Ví dụ câu vào:\n• 'Tìm phòng trọ Q.Bình Thạnh dưới 3tr/tháng'\n• 'Listing #123 còn khung giờ xem nhà thứ 7 không?'\n• 'Đặt lịch xem phòng ngày mai lúc 10h cho tôi'"]
+
+    %% ReAct Loop
+    REACT_EXAMPLES --> THOUGHT["🧠 Thought:\nAgent suy luận bước tiếp theo cần làm"]
+    THOUGHT --> ACTION_DECIDE{"⚙️ Cần gọi Tool?"}
+
+    ACTION_DECIDE -->|Có| TOOL_CALL["🛠️ Action:\nGọi 1 trong 5 Tools:\n① search_rentals\n② get_listing_details\n③ check_viewing_slots\n④ send_viewing_request\n⑤ create_calendar_event"]
+    TOOL_CALL --> OBS["👁️ Observation:\nNhận kết quả trả về từ Tool"]
+    OBS --> GUARD{"🛡️ Guardrail Check:\nstep < MAX_ITERATIONS (=3)?"}
+
+    GUARD -->|Còn bước → tiếp tục| THOUGHT
+    GUARD -->|Vượt giới hạn → DỪNG AN TOÀN| GUARDRAIL_STOP(["🛑 GUARDRAIL TRIGGERED:\nThông báo lỗi & dừng loop"])
+
+    ACTION_DECIDE -->|Không, đủ thông tin rồi| FINAL_ANSWER(["✅ Final Answer:\nTrả lời hoàn chỉnh cho người dùng\n(kèm dữ liệu thực tế từ Tool)"])
+
+    %% ─── STYLES ───────────────────────────────────────────
+    classDef chatbotStyle fill:#2563eb,color:#fff,stroke:#1d4ed8,rx:8
+    classDef reactStyle  fill:#7c3aed,color:#fff,stroke:#5b21b6,rx:8
+    classDef toolStyle   fill:#059669,color:#fff,stroke:#047857,rx:8
+    classDef guardStyle  fill:#dc2626,color:#fff,stroke:#b91c1c,rx:8
+    classDef startStyle  fill:#f59e0b,color:#000,stroke:#d97706,rx:16
+    classDef endStyle    fill:#10b981,color:#fff,stroke:#059669,rx:16
+
+    class START startStyle
+    class CB_PATH,CB_EXAMPLES,CB_GEN chatbotStyle
+    class REACT_PATH,REACT_EXAMPLES,THOUGHT reactStyle
+    class TOOL_CALL,OBS toolStyle
+    class GUARDRAIL_STOP guardStyle
+    class CB_REPLY,FINAL_ANSWER endStyle
