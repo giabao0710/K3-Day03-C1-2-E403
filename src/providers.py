@@ -5,7 +5,6 @@ Hỗ trợ chuyển đổi linh hoạt giữa các nhà cung cấp AI chỉ bằ
 
 import os
 import sys
-import json
 import re
 import requests
 from dotenv import load_dotenv
@@ -175,24 +174,28 @@ class MockProvider(BaseLLMProvider):
         return "Mình là mock provider offline và hiện chỉ mô phỏng các tình huống trong bài lab."
 
     def _generate_react_response(self, prompt: str) -> str:
-        normalized = prompt.lower()
         user_query_match = re.search(r"Câu hỏi người dùng:\s*(.+)", prompt)
         user_query = user_query_match.group(1).strip() if user_query_match else prompt.strip()
+        normalized = user_query.lower()
 
         if "case_guardrail_loop" in normalized:
             return "Thought: Tôi sẽ thử một action không hợp lệ.\nAction: unknown_tool[]"
 
-        last_observation = ""
-        last_tool_match = list(re.finditer(r'Observation:\s*(\{[\s\S]*?"tool":\s*"[^"]+"[\s\S]*?\})', prompt))
-        if last_tool_match:
-            last_observation = last_tool_match[-1].group(1).strip()
-        else:
-            last_error_match = list(re.finditer(r"Observation:\s*(LỖI:[^\n]+)", prompt))
-            if last_error_match:
-                last_observation = last_error_match[-1].group(1).strip()
+        observations = re.findall(
+            r"Observation:\s*([\s\S]*?)(?=\nThought:|\n\nHãy trả lời|\Z)",
+            prompt,
+        )
+        actions = re.findall(r"Action:\s*([A-Za-z_][A-Za-z0-9_]*)\[", prompt)
+        last_observation = observations[-1].strip() if observations else ""
+        last_tool = actions[-1] if actions else ""
 
         listing_id_match = re.search(r"(?:listing_id|tin|mã)\D*(\d{4,})", user_query, flags=re.IGNORECASE)
         listing_id = listing_id_match.group(1) if listing_id_match else "123456789"
+        observed_listing_match = re.search(r'"listing_id":\s*(\d+)', last_observation)
+        if last_tool == "search_rentals" and observed_listing_match:
+            listing_id = observed_listing_match.group(1)
+        request_id_match = re.search(r"(?:request_id|request|yêu cầu)\D*(\d+)", user_query, flags=re.IGNORECASE)
+        request_id = request_id_match.group(1) if request_id_match else "1"
         date_match = re.search(r"(20\d{2}-\d{2}-\d{2})", user_query)
         viewing_date = date_match.group(1) if date_match else "2026-08-03"
         slot_match = re.search(r"(\d{2}:\d{2})", user_query)
@@ -205,28 +208,37 @@ class MockProvider(BaseLLMProvider):
         elif "nguyen van a" in normalized:
             customer_name = "Nguyen Van A"
 
-        if ("chi tiết" in normalized or "xem tin" in normalized) and "Observation:" in prompt and "LỖI:" not in prompt:
-            return (
-                "Thought: Tôi đã có đủ chi tiết của tin đăng để tóm tắt cho người dùng.\n"
-                f"Final Answer: Tin {listing_id} đã có chi tiết đầy đủ về giá, diện tích, mô tả, ảnh và thông tin người đăng. "
-                "Nếu bạn muốn, mình có thể kiểm tra lịch trống để đặt lịch xem nhà tiếp."
-            )
-
         if not last_observation:
-            if "chi tiết" in normalized or "xem tin" in normalized:
+            if "sự khác nhau" in normalized or "thuê nhà trọ lần đầu" in normalized:
                 return (
-                    "Thought: Tôi đã có listing_id nên cần lấy chi tiết tin đăng.\n"
-                    f"Action: get_listing_details[{listing_id}]"
+                    "Thought: Đây là câu hỏi kiến thức chung nên không cần gọi tool.\n"
+                    "Final Answer: Nhà trọ thường có chi phí thấp và ít dịch vụ hơn căn hộ dịch vụ. "
+                    "Khi thuê lần đầu, bạn nên kiểm tra hợp đồng, tiền cọc, điện nước, an ninh và hiện trạng phòng."
+                )
+            if "calendar" in normalized or "tạo lịch" in normalized:
+                return (
+                    "Thought: Tôi đã có request_id nên cần tạo calendar event.\n"
+                    f"Action: create_calendar_event[{request_id}]"
+                )
+            if "đặt lịch" in normalized:
+                return (
+                    "Thought: Tôi cần kiểm tra slot trước khi gửi yêu cầu đặt lịch.\n"
+                    f"Action: check_viewing_slots[{listing_id}, \"{viewing_date}\"]"
                 )
             if "lịch trống" in normalized or "khung giờ" in normalized:
                 return (
                     "Thought: Tôi cần kiểm tra các slot còn trống cho listing đã chọn.\n"
                     f"Action: check_viewing_slots[{listing_id}, \"{viewing_date}\"]"
                 )
-            if "đặt lịch" in normalized:
+            if "tìm" in normalized:
                 return (
-                    "Thought: Tôi cần kiểm tra slot trước khi gửi yêu cầu đặt lịch.\n"
-                    f"Action: check_viewing_slots[{listing_id}, \"{viewing_date}\"]"
+                    "Thought: Tôi cần tìm các tin cho thuê phù hợp với ngân sách của khách.\n"
+                    "Action: search_rentals[12000, 1050, 1000000, 2000000, \"u,h\", 5]"
+                )
+            if "chi tiết" in normalized or "xem tin" in normalized:
+                return (
+                    "Thought: Tôi đã có listing_id nên cần lấy chi tiết tin đăng.\n"
+                    f"Action: get_listing_details[{listing_id}]"
                 )
             return (
                 "Thought: Tôi cần tìm các tin cho thuê phù hợp với ngân sách của khách.\n"
@@ -239,14 +251,26 @@ class MockProvider(BaseLLMProvider):
                 f"Final Answer: {last_observation}"
             )
 
-        if '"tool": "search_rentals"' in last_observation:
+        if last_tool == "search_rentals":
+            if "chi tiết" in normalized or "xem tin" in normalized:
+                return (
+                    "Thought: Tôi đã tìm được listing phù hợp và cần lấy chi tiết tin đầu tiên.\n"
+                    f"Action: get_listing_details[{listing_id}]"
+                )
             return (
                 "Thought: Tôi đã có danh sách tin phù hợp để tóm tắt cho người dùng.\n"
                 "Final Answer: Mình đã tìm được một số tin phù hợp trong tầm giá 1-2 triệu. "
                 "Bạn có thể chọn một listing_id từ kết quả để mình xem chi tiết hoặc kiểm tra lịch trống."
             )
 
-        if '"tool": "check_viewing_slots"' in last_observation:
+        if last_tool == "get_listing_details":
+            return (
+                "Thought: Tôi đã có đủ chi tiết của tin đăng để tóm tắt cho người dùng.\n"
+                f"Final Answer: Tin {listing_id} đã có chi tiết đầy đủ về giá, diện tích, mô tả và thông tin người đăng. "
+                "Nếu bạn muốn, mình có thể kiểm tra lịch trống để đặt lịch xem nhà tiếp."
+            )
+
+        if last_tool == "check_viewing_slots":
             if slot not in last_observation:
                 available_slot_match = re.search(r'"available_slots":\s*\[\s*"([^"]+)"', last_observation)
                 slot = available_slot_match.group(1) if available_slot_match else "09:00"
@@ -262,7 +286,7 @@ class MockProvider(BaseLLMProvider):
                 "Nếu bạn muốn chốt một giờ cụ thể, mình có thể gửi yêu cầu đặt lịch ngay."
             )
 
-        if '"tool": "send_viewing_request"' in last_observation:
+        if last_tool == "send_viewing_request":
             request_id_match = re.search(r'"request_id":\s*(\d+)', last_observation)
             request_id = request_id_match.group(1) if request_id_match else "1"
             return (
@@ -270,7 +294,7 @@ class MockProvider(BaseLLMProvider):
                 f"Action: create_calendar_event[{request_id}]"
             )
 
-        if '"tool": "create_calendar_event"' in last_observation:
+        if last_tool == "create_calendar_event":
             return (
                 "Thought: Tôi đã có đủ thông tin để xác nhận lịch xem nhà.\n"
                 "Final Answer: Đã tạo yêu cầu xem nhà thành công, trạng thái hiện là pending và sự kiện lịch nội bộ cũng đã được tạo."
