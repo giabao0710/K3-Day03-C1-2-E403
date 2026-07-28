@@ -56,7 +56,9 @@ def run_baseline_chatbot(user_query: str, provider):
     
     # Gọi LLM Provider thực hiện sinh câu trả lời
     response = provider.generate(user_query, system_prompt=CHATBOT_BASELINE_PROMPT)
-    print(f"🤖 Chatbot trả lời:\n{response}")
+    response_text = response.strip()
+    print(f"🤖 Chatbot trả lời:\n{response_text}")
+    print(f"🏁 Final Answer: {response_text}\n")
 
 
 def run_react_agent(user_query: str, provider):

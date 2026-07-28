@@ -137,6 +137,12 @@ class MockProvider(BaseLLMProvider):
         text = prompt.lower()
         if "thời tiết" in text and "hà nội" in text:
             return "Thought: Cần tra cứu thời tiết Hà Nội.\nAction: get_weather['Hà Nội']"
+        if any(keyword in text for keyword in ["phòng trọ", "thuê nhà", "giá thuê", "tp.hcm", "tphcm", "sài gòn"]):
+            return (
+                "Giá thuê phòng trọ trung bình ở TP.HCM hiện nay khoảng 2.0 - 3.5 triệu đồng/tháng, "
+                "tùy khu vực và tiện nghi. Khu trung tâm như Quận 1, 3 có thể cao hơn, trong khi Quận 12, Thủ Đức thường "
+                "rẻ hơn."
+            )
         return "🤖 [Mock Provider]: Phản hồi giả lập offline cho bài test."
 
 
