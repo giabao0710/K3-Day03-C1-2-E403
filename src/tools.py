@@ -36,19 +36,10 @@ def _build_listing_summary(ad: dict) -> dict:
     return {
         "listing_id": list_id,
         "title": ad.get("subject", "Không có tiêu đề"),
-        "price_vnd": ad.get("price"),
         "price_text": ad.get("price_string", "Không rõ"),
         "area_m2": ad.get("size"),
         "address": ", ".join(address_parts) if address_parts else "Không rõ",
-        "district": area_name or "Không rõ",
-        "ward": ward_name or "Không rõ",
-        "furnishing": _extract_furnishing(ad.get("params") or []),
-        "contact_name": seller_name,
         "status": ad.get("status", "Không rõ"),
-        "posted_time": ad.get("date", "Không rõ"),
-        "summary": ad.get("body", "").strip().replace("\n", " ")[:280],
-        "image_count": ad.get("number_of_images", 0),
-        "thumbnail": ad.get("thumbnail_image") or ad.get("image"),
     }
 
 
@@ -199,7 +190,3 @@ AVAILABLE_TOOLS = {
     "search_rentals": search_rentals,
     "get_listing_details": get_listing_details,
 }
-
-
-
-# print(search_rentals())
