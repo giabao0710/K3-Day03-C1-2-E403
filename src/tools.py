@@ -4,6 +4,7 @@ Nơi khai báo tất cả các "món đồ nghề" mà ReAct Agent có thể g�
 """
 
 import json
+import sqlite3
 from datetime import datetime
 
 import requests
@@ -49,6 +50,10 @@ def _build_listing_summary(ad: dict) -> dict:
         "address": ", ".join(address_parts) if address_parts else "Không rõ",
         "status": ad.get("status", "Không rõ"),
     }
+
+
+def _is_valid_listing_id(listing_id: int) -> bool:
+    return isinstance(listing_id, int) and listing_id > 0
 
 
 # def get_weather(location: str) -> str:
@@ -115,6 +120,17 @@ def search_rentals(
     Returns:
         str: JSON string chứa shortlist kết quả phù hợp cho ReAct Agent.
     """
+    if not all(isinstance(value, int) for value in (region_v2, category, min_price, max_price, limit)):
+        return "LỖI: region_v2, category, min_price, max_price và limit phải là số nguyên."
+    if min_price < 0 or max_price < 0:
+        return "LỖI: min_price và max_price không được âm."
+    if min_price > max_price:
+        return "LỖI: min_price không được lớn hơn max_price."
+    if limit <= 0:
+        return "LỖI: limit phải lớn hơn 0."
+    if not isinstance(property_types, str) or not property_types.strip():
+        return "LỖI: property_types phải là chuỗi hợp lệ."
+
     params = {
         "region_v2": region_v2,
         "cg": category,
@@ -154,22 +170,25 @@ def search_rentals(
     if not isinstance(ads, list):
         return "LỖI: API Chợ Tốt không trả về danh sách tin đăng hợp lệ."
 
-    summaries = []
-    for ad in ads:
-        if not isinstance(ad, dict):
-            continue
+    try:
+        summaries = []
+        for ad in ads:
+            if not isinstance(ad, dict):
+                continue
 
-        listing_id = ad.get("list_id")
-        if isinstance(listing_id, int):
-            SEARCH_CACHE[listing_id] = ad
-        summaries.append(_build_listing_summary(ad))
+            listing_id = ad.get("list_id")
+            if _is_valid_listing_id(listing_id):
+                SEARCH_CACHE[listing_id] = ad
+            summaries.append(_build_listing_summary(ad))
 
-    normalized_response = {
-        "tool": "search_rentals",
-        "total_found": total if isinstance(total, int) else len(summaries),
-        "results": summaries,
-    }
-    return json.dumps(normalized_response, ensure_ascii=False, indent=2)
+        normalized_response = {
+            "tool": "search_rentals",
+            "total_found": total if isinstance(total, int) else len(summaries),
+            "results": summaries,
+        }
+        return json.dumps(normalized_response, ensure_ascii=False, indent=2)
+    except (TypeError, ValueError) as exc:
+        return f"LỖI: Không thể chuẩn hóa dữ liệu tin đăng. Chi tiết: {exc}"
 
 
 def get_listing_details(listing_id: int) -> str:
@@ -182,13 +201,19 @@ def get_listing_details(listing_id: int) -> str:
     Returns:
         str: JSON string chứa thông tin đầy đủ của listing.
     """
+    if not _is_valid_listing_id(listing_id):
+        return "LỖI: listing_id phải là số nguyên dương."
+
     listing = SEARCH_CACHE.get(listing_id)
     if listing is None:
         return (
             f"LỖI: Không tìm thấy listing_id={listing_id}. "
             "Hãy gọi search_rentals trước."
         )
-    return json.dumps(listing, ensure_ascii=False, indent=2)
+    try:
+        return json.dumps(listing, ensure_ascii=False, indent=2)
+    except (TypeError, ValueError) as exc:
+        return f"LỖI: Không thể đọc chi tiết tin đăng {listing_id}. Chi tiết: {exc}"
 
 
 def check_viewing_slots(listing_id: int, viewing_date: str) -> str:
@@ -202,19 +227,27 @@ def check_viewing_slots(listing_id: int, viewing_date: str) -> str:
     Returns:
         str: JSON string chứa các khung giờ còn trống.
     """
+    if not _is_valid_listing_id(listing_id):
+        return "LỖI: listing_id phải là số nguyên dương."
+    if not isinstance(viewing_date, str) or not viewing_date.strip():
+        return "LỖI: viewing_date phải là chuỗi theo định dạng YYYY-MM-DD."
+
     try:
         datetime.strptime(viewing_date, "%Y-%m-%d")
     except ValueError:
         return "LỖI: viewing_date phải theo định dạng YYYY-MM-DD."
 
-    available_slots = get_available_slots(listing_id, viewing_date)
-    payload = {
-        "tool": "check_viewing_slots",
-        "listing_id": listing_id,
-        "viewing_date": viewing_date,
-        "available_slots": available_slots,
-    }
-    return json.dumps(payload, ensure_ascii=False, indent=2)
+    try:
+        available_slots = get_available_slots(listing_id, viewing_date)
+        payload = {
+            "tool": "check_viewing_slots",
+            "listing_id": listing_id,
+            "viewing_date": viewing_date,
+            "available_slots": available_slots,
+        }
+        return json.dumps(payload, ensure_ascii=False, indent=2)
+    except sqlite3.Error as exc:
+        return f"LỖI: Không thể kiểm tra lịch xem nhà. Chi tiết: {exc}"
 
 
 def send_viewing_request(
@@ -237,31 +270,45 @@ def send_viewing_request(
     Returns:
         str: JSON string chứa request_id và trạng thái yêu cầu.
     """
+    if not _is_valid_listing_id(listing_id):
+        return "LỖI: listing_id phải là số nguyên dương."
+    if not isinstance(viewing_date, str) or not viewing_date.strip():
+        return "LỖI: viewing_date phải là chuỗi theo định dạng YYYY-MM-DD."
+    if not isinstance(slot, str) or not slot.strip():
+        return "LỖI: slot phải là chuỗi hợp lệ."
+    if not isinstance(customer_name, str) or not customer_name.strip():
+        return "LỖI: customer_name không được để trống."
+    if not isinstance(customer_phone, str) or not customer_phone.strip():
+        return "LỖI: customer_phone không được để trống."
+
     try:
         datetime.strptime(viewing_date, "%Y-%m-%d")
     except ValueError:
         return "LỖI: viewing_date phải theo định dạng YYYY-MM-DD."
 
-    available_slots = get_available_slots(listing_id, viewing_date)
-    if slot not in available_slots:
-        return f"LỖI: Khung giờ {slot} không còn trống cho ngày {viewing_date}."
+    try:
+        available_slots = get_available_slots(listing_id, viewing_date)
+        if slot not in available_slots:
+            return f"LỖI: Khung giờ {slot} không còn trống cho ngày {viewing_date}."
 
-    request_id = create_viewing_request(
-        listing_id=listing_id,
-        viewing_date=viewing_date,
-        slot=slot,
-        customer_name=customer_name,
-        customer_phone=customer_phone,
-    )
-    payload = {
-        "tool": "send_viewing_request",
-        "request_id": request_id,
-        "listing_id": listing_id,
-        "viewing_date": viewing_date,
-        "slot": slot,
-        "status": "pending",
-    }
-    return json.dumps(payload, ensure_ascii=False, indent=2)
+        request_id = create_viewing_request(
+            listing_id=listing_id,
+            viewing_date=viewing_date,
+            slot=slot,
+            customer_name=customer_name.strip(),
+            customer_phone=customer_phone.strip(),
+        )
+        payload = {
+            "tool": "send_viewing_request",
+            "request_id": request_id,
+            "listing_id": listing_id,
+            "viewing_date": viewing_date,
+            "slot": slot,
+            "status": "pending",
+        }
+        return json.dumps(payload, ensure_ascii=False, indent=2)
+    except sqlite3.Error as exc:
+        return f"LỖI: Không thể lưu yêu cầu xem nhà. Chi tiết: {exc}"
 
 
 def create_calendar_event(request_id: int) -> str:
@@ -274,36 +321,43 @@ def create_calendar_event(request_id: int) -> str:
     Returns:
         str: JSON string chứa thông tin event đã tạo.
     """
-    request_row = get_viewing_request(request_id)
-    if request_row is None:
-        return f"LỖI: Không tìm thấy request_id={request_id}."
+    if not isinstance(request_id, int) or request_id <= 0:
+        return "LỖI: request_id phải là số nguyên dương."
 
-    existing_event = get_calendar_event_for_request(request_id)
-    if existing_event is not None:
+    try:
+        request_row = get_viewing_request(request_id)
+        if request_row is None:
+            return f"LỖI: Không tìm thấy request_id={request_id}."
+
+        existing_event = get_calendar_event_for_request(request_id)
+        if existing_event is not None:
+            payload = {
+                "tool": "create_calendar_event",
+                "event_id": existing_event["event_id"],
+                "request_id": request_id,
+                "start_at": existing_event["start_at"],
+                "event_status": existing_event["event_status"],
+            }
+            return json.dumps(payload, ensure_ascii=False, indent=2)
+
+        start_at = f"{request_row['viewing_date']}T{request_row['slot']}:00"
+        event_status = "tentative" if request_row["status"] == "pending" else "confirmed"
+        event_id = create_event_for_request(
+            request_id=request_id,
+            title=f"Xem nhà listing {request_row['listing_id']}",
+            start_at=start_at,
+            event_status=event_status,
+        )
         payload = {
             "tool": "create_calendar_event",
-            "event_id": existing_event["event_id"],
+            "event_id": event_id,
             "request_id": request_id,
-            "start_at": existing_event["start_at"],
-            "event_status": existing_event["event_status"],
+            "start_at": start_at,
+            "event_status": event_status,
         }
         return json.dumps(payload, ensure_ascii=False, indent=2)
-
-    start_at = f"{request_row['viewing_date']}T{request_row['slot']}:00"
-    event_id = create_event_for_request(
-        request_id=request_id,
-        title=f"Xem nhà listing {request_row['listing_id']}",
-        start_at=start_at,
-        event_status="tentative" if request_row["status"] == "pending" else "confirmed",
-    )
-    payload = {
-        "tool": "create_calendar_event",
-        "event_id": event_id,
-        "request_id": request_id,
-        "start_at": start_at,
-        "event_status": "tentative" if request_row["status"] == "pending" else "confirmed",
-    }
-    return json.dumps(payload, ensure_ascii=False, indent=2)
+    except sqlite3.Error as exc:
+        return f"LỖI: Không thể tạo calendar event. Chi tiết: {exc}"
 
 
 # Danh sách các tool được đăng ký để Agent sử dụng
